@@ -1,0 +1,70 @@
+# sqlfluff rules:
+# https://docs.sqlfluff.com/en/stable/rules.html
+
+[sqlfluff]
+templater = dbt
+exclude_rules = L031, L034
+dialect = snowflake
+max_line_length = 80
+large_file_skip_byte_limit = 27000
+
+[sqlfluff:indentation]
+# See https://docs.sqlfluff.com/en/stable/indentation.html
+allow_implicit_indents = True
+indented_joins = False
+indented_ctes = False
+indent_unit = space
+indented_using_on = True
+indented_on_contents = False
+template_blocks_indent = True
+tab_space_size = 2
+
+# layout:
+# https://docs.sqlfluff.com/en/stable/layout.html#configuring-layout-and-spacing
+
+[sqlfluff:layout:type:comma]
+line_position = trailing
+
+[sqlfluff:layout:type:binary_operator]
+line_position = leading
+
+# rules:
+# https://docs.sqlfluff.com/en/stable/rules.html
+
+[sqlfluff:rules]
+capitalisation_policy = lower
+extended_capitalisation_policy = lower
+
+# TODO - how to enforce jinja indenting?
+
+[sqlfluff:rules:aliasing.table]
+# TODO - see if fix applies?
+aliasing = explicit
+
+[sqlfluff:rules:aliasing.column]
+aliasing = explicit
+
+[sqlfluff:rules:aliasing.expression]
+allow_scalar = False
+
+[sqlfluff:rules:convention.casting_style]
+preferred_type_casting_style = shorthand
+
+[sqlfluff:rules:layout.long_lines]
+ignore_comment_clauses = False
+ignore_comment_lines = False
+
+[sqlfluff:rules:references.consistent]
+single_table_references = consistent
+
+[sqlfluff:rules:convention.select_trailing_comma]
+select_clause_trailing_comma = forbid
+
+[sqlfluff:rules:ambiguous.join]
+fully_qualify_join_types = inner
+
+[sqlfluff:rules:ambiguous.column_references]
+group_by_and_order_by_style = consistent
+
+[sqlfluff:templater:jinja]
+apply_dbt_builtins = True
