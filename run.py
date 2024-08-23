@@ -7,7 +7,7 @@ from urllib.request import Request, urlopen
 
 from scripts.dbt.run_and_monitor_job.utils import configure_logger
 
-# TODO(amir): create a base python image for `mfg-dbt` and install `rivian-common-fd-logging` in the base
+# TODO(amir): create a base python image for `mfg-dbt` and install `companyname-common-fd-logging` in the base
 # image; once we have our standard logging library, `utils.py` should be removed.
 logger = logging.getLogger(
     name=__name__,
