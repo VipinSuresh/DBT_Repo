@@ -1,0 +1,113 @@
+.common:
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/python:3.9
+  tags: ["dme"]
+  interruptible: true
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+
+.env_setup:
+  before_script:
+  - env
+
+  # TODO(shawnmorel) move the dependencies to a base image
+  - python -m pip install dbt-snowflake=="1.6.4"
+  - apt update -yq
+  - apt install -yq awscli
+
+  - mkdir -p $HOME/.dbt
+  - |
+    cat <<EOF >> $HOME/.dbt/profiles.yml
+    default:
+      target: prod
+      outputs:
+        prod:
+          type: snowflake
+          account: ##add company
+          database: mfg
+          schema: public
+          role: transformer
+          warehouse: transforming
+          threads: 1
+          client_session_keep_alive: true
+
+          user: ${SNOWFLAKE_USERNAME}
+          password: ${SNOWFLAKE_PASSWORD}
+    EOF
+
+stages:
+  - linting
+  - build
+  - publish
+
+workflow:
+  rules:
+    # Run pipelines for merge requests and changes merged to the main branch
+    - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+
+SQL linting:
+  stage: linting
+  extends:
+    - .common
+    - .env_setup
+  rules:
+    - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
+      when: always
+  before_script:
+    - !reference [.env_setup, before_script]
+    - python -m pip install sqlfluff-templater-dbt=="2.3.2"
+  script:
+    - dbt deps
+    - git fetch origin main
+    - diff-quality --violations sqlfluff --fail-under=100
+
+# TODO(shawnmorel) allow sharing template from common DME gitlab templates
+
+prod deploy (modified only):
+  stage: build
+  extends: .common
+  rules:
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+      when: always
+  variables:
+    DBT_ACCOUNT_ID: $DBT_ACCOUNT_ID
+    DBT_PROJECT_ID: $DBT_PROJECT_ID
+    DBT_API_KEY: $DBT_API_KEY
+    DBT_JOB_BRANCH: $CI_COMMIT_BRANCH
+    DBT_MR_JOB_ID: 111506 # Prod Deploy (Modified Only)
+    DBT_JOB_CAUSE: "GitLab Pipeline CI Job"
+  before_script:
+    - python -V
+    - env
+  script:
+    - python -m scripts.dbt.run_and_monitor_job.__main__
+
+publish docs:
+  stage: publish
+  extends:
+    - .common
+    - .env_setup
+  rules:
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+      when: always
+  script:
+    - aws sts get-caller-identity
+    - mkdir -p target
+    - dbt deps
+    # TODO(JPG) remove after resolution of https://github.com/wbond/oscrypto/issues/78
+    # NOTE: This is added because documentation fails to build due to the error:
+    # Error detecting the version of libcrypto
+    # This should be fixed in an upcoming release, (2023-10-23 of an open source
+    # project estimate)
+    - python -m pip install --force-reinstall https://github.com/wbond/oscrypto/archive/d5f3437ed24257895ae1edd9e503cfb352e635a8.zip
+
+    # TODO(shawnmorel) figure out how to cache catalog build to speed this up
+    - dbt docs generate
+
+    # NOTE: be careful changing this path, all CI jobs are able to write to any part of this bucket
+    # and also multiple buckets in various target accounts. We've yet to lock down these permissions.
+    # TODO(shawnmorel) come back and change this to prod once the prod docs bucket is live.
+    - aws s3 sync ./target s3://data-docs.mfgeng.goriv.co/
