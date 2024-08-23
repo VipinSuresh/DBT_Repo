@@ -2,7 +2,7 @@ import logging
 import sys
 
 
-# TODO(amir): create a base python image for `mfg-dbt` and install `rivian-common-fd-logging` in the base
+# TODO(amir): create a base python image for `mfg-dbt` and install `companyname-common-fd-logging` in the base
 # image; once we have our standard logging library, `utils.py` should be removed.
 def configure_logger(logger: logging.Logger) -> None:
     """Configures the given logger with custom formatting.
